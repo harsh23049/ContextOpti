@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "contextopti"
+version = "0.1.0"
+description = "Structure-conditioned selective and budgeted context selection for LLM code completion"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+dependencies = [
+    "networkx>=3.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# M2 semantic baseline. Kept optional so M1 never blocks on a model download.
+semantic = [
+    "scikit-learn>=1.3",
+    "numpy>=1.24",
+]
+# Heavier embedding backend, only if TF-IDF/BM25 proves insufficient.
+embeddings = [
+    "sentence-transformers>=2.2",
+]
+dev = [
+    "pytest>=7.4",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["contextopti*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

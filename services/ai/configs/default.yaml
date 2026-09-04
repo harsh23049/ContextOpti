@@ -1,0 +1,74 @@
+# ContextOpti research configuration.
+#
+# One file drives every milestone script so a run is reproducible from a single
+# artifact. Paths are relative to the repository root.
+
+seed: 1337
+
+paths:
+  fixture_repo: data/fixtures/toy_repo
+  outputs: outputs
+  graph: outputs/m1_graph.json
+
+index:
+  language: python
+  exclude_dirs:
+    - .git
+    - .venv
+    - venv
+    - __pycache__
+    - .pytest_cache
+    - node_modules
+    - build
+    - dist
+
+# Hard budgets the policy must respect. T_max is the context token ceiling for a
+# single completion request; L_max is the end-to-end latency ceiling in milliseconds.
+budgets:
+  T_max: 2048
+  L_max: 400
+
+# Always-on structure retrieval baseline (M3). Also the starting point of the
+# budget sweep in M5.
+structure:
+  hops: 2
+  tok: 1024
+  max_candidates: 32
+
+# Semantic baseline (M2).
+semantic:
+  backend: tfidf        # tfidf | bm25 | sentence-transformers
+  model: null           # set when backend is sentence-transformers
+  top_k: 8
+  chunk_lines: 40
+  chunk_overlap: 8
+  tok: 1024
+
+# Selective / budgeted policy (M4) -- the research contribution.
+policy:
+  kind: heuristic       # heuristic | learned
+  # Cost weight in the training objective: quality - lambda * cost.
+  lambda_cost: 0.15
+  # Action space the policy chooses from.
+  actions:
+    hops: [1, 2, 3]
+    tok: [256, 512, 1024, 2048]
+  heuristic:
+    # Retrieve when the cursor's ego-graph looks like it needs cross-file context.
+    min_cross_file_edges: 1
+    min_unresolved_refs: 1
+
+# Generator. MUST stay frozen across policy experiments -- changing it invalidates
+# the M5 table and requires re-running every row.
+generate:
+  provider: mock        # mock | anthropic | openai | gemini
+  model: null
+  temperature: 0.0
+  max_tokens: 256
+  frozen: true
+
+eval:
+  max_eval_n: 200
+  # Budget sweep for the M5 Pareto frontier.
+  sweep_tok: [128, 256, 512, 1024, 2048]
+  metrics: [exact_match, edit_similarity, tokens, latency_ms]
