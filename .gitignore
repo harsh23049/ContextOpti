@@ -1,0 +1,23 @@
+# Experiment artifacts: regenerate with the milestone scripts, never commit.
+outputs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Node (product path, phases 7+)
+node_modules/
+dist/
+build/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
