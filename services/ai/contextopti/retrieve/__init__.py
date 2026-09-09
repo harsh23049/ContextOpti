@@ -8,3 +8,6 @@ can assemble context from either or both without caring which produced it.
 
 Not implemented yet -- M2/M3.
 """
+from .graph_retriever import GraphRetriever, SeedFinder
+
+__all__ = ["GraphRetriever", "SeedFinder"]
