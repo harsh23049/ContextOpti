@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Milestone 2 (M2) Entrypoint Script: m2_retrieve_context.py
+Milestone 3 (M3) Entrypoint Script: m3_retrieve_context.py
 
-Runs pure semantic (vector/TF-IDF) context retrieval for a single query
-and saves the prompt payload to outputs/m2_context.json.
+Runs structural graph BFS context retrieval for a single query
+and saves the prompt payload to outputs/m3_context.json.
 """
 
 import argparse
@@ -18,7 +18,7 @@ if str(SERVICE_DIR) not in sys.path:
     sys.path.insert(0, str(SERVICE_DIR))
 
 from contextopti.rank import ContextRanker, TokenPacker
-from contextopti.retrieve.semantic import SemanticRetriever
+from contextopti.retrieve import GraphRetriever
 
 
 def resolve_graph_path(path: str) -> str:
@@ -38,15 +38,16 @@ def resolve_graph_path(path: str) -> str:
     return path
 
 
-def run_m2_pipeline(
+def run_m3_pipeline(
     graph_path: str = "outputs/m1_graph.json",
     query: str = "order creation payment",
+    max_hops: int = 2,
     max_nodes: int = 10,
     token_budget: int = 500,
-    output_path: str = "outputs/m2_context.json"
+    output_path: str = "outputs/m3_context.json"
 ) -> dict:
     print("=" * 60)
-    print("ContextOpti - Milestone 2 (M2) Pure Semantic Context Retrieval")
+    print("ContextOpti - Milestone 3 (M3) Structural Graph Context Retrieval")
     print("=" * 60)
     
     resolved_graph = resolve_graph_path(graph_path)
@@ -54,27 +55,28 @@ def run_m2_pipeline(
     if not os.path.exists(resolved_graph):
         raise FileNotFoundError(f"M1 graph file not found. Tried path: {graph_path}")
         
-    print(f"[*] Loading code chunk index from: {resolved_graph}")
+    print(f"[*] Loading M1 code graph from: {resolved_graph}")
     with open(resolved_graph, "r", encoding="utf-8") as f:
         graph_data = json.load(f)
         
-    # Step 1: Pure Semantic Retrieval using TFIDFVectorizer / Cosine Similarity
-    print(f"[*] Semantic Retrieval for query: '{query}'")
-    retriever = SemanticRetriever(graph_data)
-    semantic_candidates = retriever.retrieve_candidates(query=query, top_k=max_nodes)
+    print(f"    Loaded {len(graph_data.get('nodes', []))} nodes, {len(graph_data.get('edges', []))} edges.")
     
-    print(f"    Retrieved {len(semantic_candidates)} candidate code chunks.")
+    # Step 1: Structural Graph Retrieval using BFS Traversal
+    print(f"[*] Subgraph Retrieval for query: '{query}' (max_hops={max_hops})")
+    retriever = GraphRetriever(graph_data)
+    subgraph = retriever.retrieve_subgraph(query=query, max_hops=max_hops, max_nodes=max_nodes)
+    
+    print(f"    Retrieved {subgraph['total_retrieved']} candidate nodes from seeds: {subgraph['seed_ids']}")
     
     # Step 2: Scoring and Ranking
-    print("[*] Ranking semantic candidate chunks...")
+    print("[*] Scoring and Ranking graph nodes...")
     ranker = ContextRanker()
-    repo_root = graph_data.get("meta", {}).get("repo_root", "")
-    ranked_nodes = ranker.score_and_rank(semantic_candidates, repo_root=repo_root)
+    repo_root = subgraph.get("repo_root", "")
+    ranked_nodes = ranker.score_and_rank(subgraph["nodes"], repo_root=repo_root)
     
     for r in ranked_nodes:
         file_disp = r.get("file_path") or r.get("file", "N/A")
-        score_val = r.get("semantic_score", r.get("composite_score", 0.0))
-        print(f"    - [{score_val:.4f}] {r.get('id')} (file: {file_disp}, est. tokens: {r['estimated_tokens']})")
+        print(f"    - [{r['composite_score']:.3f}] {r.get('id')} (file: {file_disp}, est. tokens: {r['estimated_tokens']})")
 
     # Step 3: Token Budget Packing
     print(f"[*] Packing context snippets under budget of {token_budget} tokens...")
@@ -85,48 +87,47 @@ def run_m2_pipeline(
     
     # Step 4: Write Output
     os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else ".", exist_ok=True)
-    m2_output = {
-        "milestone": "M2",
-        "method": "Pure Semantic (TF-IDF Cosine Similarity)",
+    m3_output = {
+        "milestone": "M3",
+        "method": "Structural Graph BFS Traversal",
         "query": query,
         "parameters": {
+            "max_hops": max_hops,
             "max_nodes": max_nodes,
             "token_budget": token_budget
         },
-        "retrieval": {
-            "query": query,
-            "candidates": semantic_candidates,
-            "total_retrieved": len(semantic_candidates)
-        },
+        "retrieval": subgraph,
         "ranked_nodes": ranked_nodes,
         "packed_context": packed_result
     }
     
     with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(m2_output, f, indent=2)
+        json.dump(m3_output, f, indent=2)
         
-    print(f"[*] Successfully saved M2 semantic context payload to: {output_path}")
+    print(f"[*] Successfully saved M3 structural context payload to: {output_path}")
     print("=" * 60)
     print("\n--- FORMATTED CONTEXT PREVIEW ---")
     print(packed_result["formatted_text"])
     print("=" * 60)
     
-    return m2_output
+    return m3_output
 
 
 def main():
-    parser = argparse.ArgumentParser(description="ContextOpti M2 Semantic Context Retrieval")
+    parser = argparse.ArgumentParser(description="ContextOpti M3 Structural Context Retrieval")
     parser.add_argument("--graph", default="outputs/m1_graph.json", help="Path to M1 graph JSON")
     parser.add_argument("--query", default="order creation payment", help="Query string or target entrypoint")
+    parser.add_argument("--max-hops", type=int, default=2, help="Max graph traversal hops")
     parser.add_argument("--max-nodes", type=int, default=10, help="Max nodes to retrieve")
     parser.add_argument("--budget", type=int, default=500, help="Token budget limit")
-    parser.add_argument("--output", default="outputs/m2_context.json", help="Output path")
+    parser.add_argument("--output", default="outputs/m3_context.json", help="Output path")
     
     args = parser.parse_args()
     
-    run_m2_pipeline(
+    run_m3_pipeline(
         graph_path=args.graph,
         query=args.query,
+        max_hops=args.max_hops,
         max_nodes=args.max_nodes,
         token_budget=args.budget,
         output_path=args.output

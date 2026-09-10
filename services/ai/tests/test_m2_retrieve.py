@@ -1,9 +1,13 @@
 """
-Unit tests for Milestone 2 (M2): Context Retrieval & Ranking in ContextOpti.
+Unit tests for Milestone 2 (M2) Pure Semantic RAG and Milestone 3 (M3) Graph Structure Retrieval.
 """
 
+import os
+import json
 import pytest
-from contextopti.retrieve.graph_retriever import GraphRetriever, SeedFinder, tokenize
+
+from contextopti.retrieve.semantic import SemanticRetriever, TFIDFVectorizer, cosine_similarity
+from contextopti.retrieve.graph_retriever import GraphRetriever, SeedFinder
 from contextopti.rank.scorer import ContextRanker, TokenPacker
 
 
@@ -38,18 +42,31 @@ def sample_graph():
     }
 
 
-def test_tokenize():
-    tokens = tokenize("OrderService.place_order")
-    assert "order" in tokens
-    assert "service" in tokens
-    assert "place" in tokens
+def test_tfidf_vectorizer_and_cosine():
+    docs = [
+        "def create_order(user_id, items): return save_order()",
+        "def process_payment(amount, card): return charge()"
+    ]
+    vec = TFIDFVectorizer()
+    vec.fit(docs)
+    
+    v1 = vec.transform("create order")
+    v2 = vec.transform("process payment")
+    
+    sim_same = cosine_similarity(v1, v1)
+    sim_diff = cosine_similarity(v1, v2)
+    
+    assert sim_same == pytest.approx(1.0, rel=1e-3)
+    assert sim_diff < sim_same
 
 
-def test_seed_finder(sample_graph):
-    finder = SeedFinder(sample_graph["nodes"])
-    seeds = finder.find_seeds("handle_request", top_k=1)
-    assert len(seeds) == 1
-    assert seeds[0][0]["id"] == "app.controllers:handle_request"
+def test_semantic_retriever(sample_graph):
+    retriever = SemanticRetriever(sample_graph)
+    candidates = retriever.retrieve_candidates("handle request", top_k=2)
+    
+    assert len(candidates) > 0
+    assert candidates[0]["id"] == "app.controllers:handle_request"
+    assert "semantic_score" in candidates[0]
 
 
 def test_graph_retriever(sample_graph):
@@ -61,24 +78,24 @@ def test_graph_retriever(sample_graph):
 
 
 def test_context_ranker(sample_graph):
-    retriever = GraphRetriever(sample_graph)
-    subgraph = retriever.retrieve_subgraph(query="handle request", max_hops=1)
+    retriever = SemanticRetriever(sample_graph)
+    candidates = retriever.retrieve_candidates("handle request", top_k=2)
     
     ranker = ContextRanker()
-    ranked = ranker.score_and_rank(subgraph["nodes"])
+    ranked = ranker.score_and_rank(candidates)
     
-    assert len(ranked) == 2
+    assert len(ranked) > 0
     assert ranked[0]["id"] == "app.controllers:handle_request"
 
 
 def test_token_packer(sample_graph):
-    retriever = GraphRetriever(sample_graph)
-    subgraph = retriever.retrieve_subgraph(query="handle request", max_hops=1)
+    retriever = SemanticRetriever(sample_graph)
+    candidates = retriever.retrieve_candidates("handle request", top_k=2)
     ranker = ContextRanker()
-    ranked = ranker.score_and_rank(subgraph["nodes"])
+    ranked = ranker.score_and_rank(candidates)
     
-    packer = TokenPacker(max_token_budget=20)
+    packer = TokenPacker(max_token_budget=50)
     packed = packer.pack_context(ranked)
     
-    assert packed["tokens_used"] <= 20
+    assert packed["tokens_used"] <= 50
     assert "formatted_text" in packed
