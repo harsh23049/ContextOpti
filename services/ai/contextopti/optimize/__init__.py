@@ -5,6 +5,7 @@ the context block that goes into the prompt: dedupe, order, truncate, and accoun
 
 The budget is an input here, never a decision -- deciding ``tok`` belongs to
 :mod:`contextopti.policy`.
-
-Not implemented yet -- M3.
 """
+from .assembler import assemble_context, deduplicate_candidates, estimate_tokens, truncate_snippet
+
+__all__ = ["assemble_context", "deduplicate_candidates", "estimate_tokens", "truncate_snippet"]

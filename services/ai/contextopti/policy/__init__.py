@@ -4,13 +4,21 @@ Interface the rest of the system codes against::
 
     decision = policy.decide(state)   # -> Decision(retrieve: bool, hops: int, tok: int)
 
-Two implementations are planned, in this order:
+Implementations:
 
-* ``heuristic.py`` -- thresholds over graph state features. Shipped first on purpose:
-  if a heuristic already beats always-on retrieval, that *is* the result, and the
-  learned policy becomes an improvement on a demonstrated effect rather than a search
-  for one.
-* ``learned.py``   -- classifier or RL policy trained against ``quality - lambda * cost``.
-
-Not implemented yet -- M4.
+* ``HeuristicPolicy``      -- thresholds over graph state features (M4 v1).
+* ``AlwaysRetrievePolicy``  -- always-on baseline (rows 2, 3 of the table).
+* ``NeverRetrievePolicy``   -- no retrieval baseline (row 1).
+* ``learned.py``            -- future: classifier or RL policy trained against
+                               ``quality - lambda * cost``.
 """
+from .decision import BasePolicy, Decision
+from .heuristic import AlwaysRetrievePolicy, HeuristicPolicy, NeverRetrievePolicy
+
+__all__ = [
+    "BasePolicy",
+    "Decision",
+    "HeuristicPolicy",
+    "AlwaysRetrievePolicy",
+    "NeverRetrievePolicy",
+]
